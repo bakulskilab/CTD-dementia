@@ -22,46 +22,27 @@ PMCID: PMC13504461  PMID: 42638620
 
 Code file summary:
 
-01_data_management
-Data cleaning and file preparation 
-Datasets:
-"CTD_human_genes_1.2.25.csv"
-"CTD_chem_gene_ixns.8.7.25..csv"
-“CTD_chem_gene_ixns_cleaned_10.30.25.xlsx"
+01_data_management: Data cleaning and file preparation 
 
 
-02_apply_chemical_classifications
-Applying chemical classifications
-Datasets: 
-"CTD_chem_GE50_genes_10.30.25.xlsx"
-"ctd_31_meshparentsplit_4.29.25.xlsx"
+
+02_apply_chemical_classifications: Applying chemical classifications
 
 
-03_analysis
-Enrichment analysis 
-Datasets:
-"Human_gene_list_11.3.25_list.rds"
-"Chemical_gene_list_analytic_11.3.25.rds"
-"Ad_list_11.3.25.rds”
-"Er_list_11.3.25.rds"
-"Isr_list_11.3.25.rds"
-"Mgca_list_11.3.25.rds"
-"Nid_list_11.3.25.rds"
-"Pro.def_list_11.3.25.rds"
-"Rup_list_11.3.25.rds"
-"Tau_list_11.3.25.rds"
-"Tdpp_list_11.3.25.rds"
+
+03_analysis: Enrichment analysis 
 
 
-04_figures_tables
+
+04_figures_tables:
 Figures and tables 
 
 
-05_overlap
+05_overlap:
 Overlap testing with nominated therapeutic target genes for AD treatment or prevention from Agora on the AD Knowledge Portal
 
 
-06_cross_validation
+06_cross_validation:
 Cross validation testing 
 
 
