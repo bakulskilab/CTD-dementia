@@ -50,5 +50,5 @@ Cross validation testing
 
 ## Data used in this analysis 
 Data used in this analysis is publicly available at: 
-Comparative Toxicogenomics Data base: https://ctdbase.org/
+Comparative Toxicogenomics Data base: https://ctdbase.org/, and
 Agora: https://agora.adknowledgeportal.org/
