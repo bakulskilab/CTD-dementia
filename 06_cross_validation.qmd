@@ -1,0 +1,661 @@
+---
+title: "CTD cross validation"
+format: html
+editor: visual
+---
+
+```{r}
+#| echo: false
+#set path
+source_path= "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/data/code review 12.2.25/"
+
+
+#libraries
+library(data.table)
+library(tidyverse)
+library(openxlsx)
+library(UpSetR)
+library(grDevices)
+library(RColorBrewer)
+```
+
+```{r}
+#Load preformatted datasets/lists
+HU<- readRDS(paste0(source_path, "human_gene_list_11.3.25_list.rds"))
+CG<- readRDS(paste0(source_path, "chemical_gene_list_analytic_11.3.25.rds"))
+```
+
+```{r}
+#Generate pseudo-disease lists of 50, 100, 200, 400, 1000 to represent tested disease gene lists 
+#try unlist to turn hum into a vector and see if thatll work for random sample
+t.hum<- unlist(HU$Hum)
+
+
+
+
+random_subsets <- replicate(n = 1, 
+                            expr = sample(t.hum, size = 50), 
+                            simplify = FALSE)
+
+random_subsets2 <- replicate(n = 1, 
+                            expr = sample(t.hum, size = 100), 
+                            simplify = FALSE)
+
+random_subsets3 <- replicate(n = 1, 
+                            expr = sample(t.hum, size = 150), 
+                            simplify = FALSE)
+
+random_subsets4 <- replicate(n = 1, 
+                            expr = sample(t.hum, size = 200), 
+                            simplify = FALSE)
+
+random_subsets5 <- replicate(n = 1, 
+                            expr = sample(t.hum, size = 400), 
+                            simplify = FALSE)
+
+random_subsets6 <- replicate(n = 1, 
+                            expr = sample(t.hum, size = 1000), 
+                            simplify = FALSE)
+
+
+
+
+```
+
+# set 1
+
+```{r}
+#get cell values for 2x2 tables
+# N: total number of human genes in genome
+# N0_: unique number of genes per chemical
+# N_0: unique number of genes related to ER stress
+# a: number of genes related to ER and Chem for each chemical
+# b: For each chemical: number of genes associated with chemical only
+# c: for each chemical: number of genes associated with chemical only
+# d: For each chemical: number of genes not associated with either chemical or ER
+#=====================================================================================
+
+#---------------------------------------------------------
+#N: count number of genes in human genome list
+#save as value 
+#N <- length(unique(HU$Hum))
+N <- length(HU$Hum)
+
+#---------------------------------------------------------
+#N0_: count total number of unique gene_symbols per chem 
+#save as matrix use for margin count
+uniq.chem <- 
+  do.call(rbind, 
+          lapply(CG, function(x) length(unique(x$gene_symbol))))
+
+N0_ <- uniq.chem
+
+
+
+
+
+#---------------------------------------------------------
+#N_0: count number of DIS genes & save as list 
+N_0 <- length(random_subsets[[1]]) 
+
+
+
+#---------------------------------------------------------
+#a: count number of genes related to DIS and Chem for each chemical
+a <- sapply(CG, function(x) sum(x$gene_symbol %in% random_subsets[[1]])); a<-as.matrix(a, ncol=1)
+
+
+
+#---------------------------------------------------------
+#Get cell/margin counts using values obtained above
+b = N0_ - a;
+c = N_0 - a;
+d = N-a-b-c;
+N1_ = N - N0_; 
+N_1 = N - N_0;
+
+
+#---------------------------------------------------------
+#Hum_t: 2x2 tables for all chemicals stored as list of dfs
+# 1: save empty list for the information to go into 
+# 2: combine all cell values by chemical
+#-------------
+# What the code is doing: 
+#   For each item in the length of the chemical gene list 
+#   combine cell values by row (chemical name) and create 
+#   individual matrix for each chemical w/ 3 columns &
+#   3 rows. Name each row and column to have appropriate 
+#   titles save that whole thing as a list of data frames. 
+#---------------------------------------------------------
+
+Hum_t <- list()
+for (i in 1:length(CG)) {
+  
+  Hum_t[[i]] <- matrix(c(a[i], b[i], N0_[1], 
+                         c[i], d[i], N1_[1], 
+                         N_0,  N_1,  N), ncol=3, byrow=T)
+  
+  rownames(Hum_t[[i]]) <- c("Yes","No","Total")
+  colnames(Hum_t[[i]]) <- c("Yes","No","Total")
+  
+  Hum_t[[i]] <- as.data.frame(Hum_t[[i]])
+}
+
+#save names to match chem list 
+names(Hum_t) <- names(CG)
+
+#===============================================================================
+#4: Fishers exact test
+#===============================================================================
+# Fisher test
+fisher <- lapply(Hum_t, function(x) fisher.test(x[1:2,1:2], simulate.p.value = TRUE))
+f <- data.frame(matrix(unlist(fisher), nrow=1008, byrow=TRUE),stringsAsFactors=FALSE) 
+
+
+#fix names names
+row.names(f) <- names(Hum_t)
+names(f)[1] <- "fisher_pvalue"
+names(f)[2] <- "fisher_LCI"
+names(f)[3] <- "fisher_UCI"
+names(f)[4] <- "fisher_estimate"
+
+#restrict 
+f<- select(f, 1:4)
+
+#FDR correction
+#f$fisher_FDR <- p.adjust(f$fisher_pvalue, method="fdr")
+#add categorical identifier for plotting
+f$sample_size <- rep("50", 1008)
+```
+
+```{r}
+plot(density(f$fisher_FDR))
+```
+
+# set 2
+
+```{r}
+#---------------------------------------------------------
+#N: count number of genes in human genome list
+#save as value 
+#N <- length(unique(HU$Hum))
+N <- length(HU$Hum)
+
+#---------------------------------------------------------
+#N0_: count total number of unique gene_symbols per chem 
+#save as matrix use for margin count
+uniq.chem <- 
+  do.call(rbind, 
+          lapply(CG, function(x) length(unique(x$gene_symbol))))
+
+N0_ <- uniq.chem
+
+#---------------------------------------------------------
+#N_0: count number of DIS genes & save as list 
+N_0 <- length(random_subsets2[[1]]) 
+
+
+
+#---------------------------------------------------------
+#a: count number of genes related to DIS and Chem for each chemical
+a <- sapply(CG, function(x) sum(x$gene_symbol %in% random_subsets2[[1]])); a<-as.matrix(a, ncol=1)
+
+
+
+#---------------------------------------------------------
+#Get cell/margin counts using values obtained above
+b = N0_ - a;
+c = N_0 - a;
+d = N-a-b-c;
+N1_ = N - N0_; 
+N_1 = N - N_0;
+
+
+#---------------------------------------------------------
+#Hum_t: 2x2 tables for all chemicals stored as list of dfs
+# 1: save empty list for the information to go into 
+# 2: combine all cell values by chemical
+#-------------
+# What the code is doing: 
+#   For each item in the length of the chemical gene list 
+#   combine cell values by row (chemical name) and create 
+#   individual matrix for each chemical w/ 3 columns &
+#   3 rows. Name each row and column to have appropriate 
+#   titles save that whole thing as a list of data frames. 
+#---------------------------------------------------------
+
+Hum_t <- list()
+for (i in 1:length(CG)) {
+  
+  Hum_t[[i]] <- matrix(c(a[i], b[i], N0_[1], 
+                         c[i], d[i], N1_[1], 
+                         N_0,  N_1,  N), ncol=3, byrow=T)
+  
+  rownames(Hum_t[[i]]) <- c("Yes","No","Total")
+  colnames(Hum_t[[i]]) <- c("Yes","No","Total")
+  
+  Hum_t[[i]] <- as.data.frame(Hum_t[[i]])
+}
+
+#save names to match chem list 
+names(Hum_t) <- names(CG)
+
+#===============================================================================
+#4: Fishers exact test
+#===============================================================================
+# Fisher test
+fisher2 <- lapply(Hum_t, function(x) fisher.test(x[1:2,1:2], simulate.p.value = TRUE))
+f2 <- data.frame(matrix(unlist(fisher2), nrow=1008, byrow=TRUE),stringsAsFactors=FALSE) 
+
+
+#fix names names
+row.names(f2) <- names(Hum_t)
+names(f2)[1] <- "fisher_pvalue"
+names(f2)[2] <- "fisher_LCI"
+names(f2)[3] <- "fisher_UCI"
+names(f2)[4] <- "fisher_estimate"
+
+#restrict 
+f2<- select(f2, 1:4)
+
+#FDR correction
+f2$sample_size <- rep("100", 1008)
+
+
+#how to get them both on the same plot?
+#pivot longer or rbind them 
+```
+
+# set 3
+
+```{r}
+#---------------------------------------------------------
+#N: count number of genes in human genome list
+#save as value 
+#N <- length(unique(HU$Hum))
+N <- length(HU$Hum)
+
+#---------------------------------------------------------
+#N0_: count total number of unique gene_symbols per chem 
+#save as matrix use for margin count
+uniq.chem <- 
+  do.call(rbind, 
+          lapply(CG, function(x) length(unique(x$gene_symbol))))
+
+N0_ <- uniq.chem
+
+#---------------------------------------------------------
+#N_0: count number of DIS genes & save as list 
+N_0 <- length(random_subsets3[[1]]) 
+
+#---------------------------------------------------------
+#a: count number of genes related to DIS and Chem for each chemical
+a <- sapply(CG, function(x) sum(x$gene_symbol %in% random_subsets3[[1]])); a<-as.matrix(a, ncol=1)
+
+#---------------------------------------------------------
+#Get cell/margin counts using values obtained above
+b = N0_ - a;
+c = N_0 - a;
+d = N-a-b-c;
+N1_ = N - N0_; 
+N_1 = N - N_0;
+#---------------------------------------------------------
+#Hum_t: 2x2 tables for all chemicals stored as list of dfs
+Hum_t <- list()
+for (i in 1:length(CG)) {
+  
+  Hum_t[[i]] <- matrix(c(a[i], b[i], N0_[1], 
+                         c[i], d[i], N1_[1], 
+                         N_0,  N_1,  N), ncol=3, byrow=T)
+  
+  rownames(Hum_t[[i]]) <- c("Yes","No","Total")
+  colnames(Hum_t[[i]]) <- c("Yes","No","Total")
+  
+  Hum_t[[i]] <- as.data.frame(Hum_t[[i]])
+}
+
+#save names to match chem list 
+names(Hum_t) <- names(CG)
+
+#===============================================================================
+#4: Fishers exact test
+#===============================================================================
+# Fisher test
+fisher3 <- lapply(Hum_t, function(x) fisher.test(x[1:2,1:2], simulate.p.value = TRUE))
+f3 <- data.frame(matrix(unlist(fisher3), nrow=1008, byrow=TRUE),stringsAsFactors=FALSE) 
+
+
+#fix names names
+row.names(f3) <- names(Hum_t)
+names(f3)[1] <- "fisher_pvalue"
+names(f3)[2] <- "fisher_LCI"
+names(f3)[3] <- "fisher_UCI"
+names(f3)[4] <- "fisher_estimate"
+
+#restrict 
+f3<- select(f3, 1:4)
+
+#FDR correction
+f3$sample_size <- rep("150", 1008)
+```
+
+# set 4
+
+```{r}
+#---------------------------------------------------------
+#N: count number of genes in human genome list
+#save as value 
+#N <- length(unique(HU$Hum))
+N <- length(HU$Hum)
+
+#---------------------------------------------------------
+#N0_: count total number of unique gene_symbols per chem 
+#save as matrix use for margin count
+uniq.chem <- 
+  do.call(rbind, 
+          lapply(CG, function(x) length(unique(x$gene_symbol))))
+
+N0_ <- uniq.chem
+
+#---------------------------------------------------------
+#N_0: count number of DIS genes & save as list 
+N_0 <- length(random_subsets4[[1]]) 
+
+#---------------------------------------------------------
+#a: count number of genes related to DIS and Chem for each chemical
+a <- sapply(CG, function(x) sum(x$gene_symbol %in% random_subsets4[[1]])); a<-as.matrix(a, ncol=1)
+
+#---------------------------------------------------------
+#Get cell/margin counts using values obtained above
+b = N0_ - a;
+c = N_0 - a;
+d = N-a-b-c;
+N1_ = N - N0_; 
+N_1 = N - N_0;
+#---------------------------------------------------------
+#Hum_t: 2x2 tables for all chemicals stored as list of dfs
+Hum_t <- list()
+for (i in 1:length(CG)) {
+  
+  Hum_t[[i]] <- matrix(c(a[i], b[i], N0_[1], 
+                         c[i], d[i], N1_[1], 
+                         N_0,  N_1,  N), ncol=3, byrow=T)
+  
+  rownames(Hum_t[[i]]) <- c("Yes","No","Total")
+  colnames(Hum_t[[i]]) <- c("Yes","No","Total")
+  
+  Hum_t[[i]] <- as.data.frame(Hum_t[[i]])
+}
+
+#save names to match chem list 
+names(Hum_t) <- names(CG)
+
+#===============================================================================
+#4: Fishers exact test
+#===============================================================================
+# Fisher test
+fisher4 <- lapply(Hum_t, function(x) fisher.test(x[1:2,1:2], simulate.p.value = TRUE))
+f4 <- data.frame(matrix(unlist(fisher4), nrow=1008, byrow=TRUE),stringsAsFactors=FALSE) 
+
+
+#fix names names
+row.names(f4) <- names(Hum_t)
+names(f4)[1] <- "fisher_pvalue"
+names(f4)[2] <- "fisher_LCI"
+names(f4)[3] <- "fisher_UCI"
+names(f4)[4] <- "fisher_estimate"
+
+#restrict 
+f4<- select(f4, 1:4)
+
+#FDR correction
+f4$sample_size <- rep("200", 1008)
+```
+
+# set 5
+
+```{r}
+#---------------------------------------------------------
+#N: count number of genes in human genome list
+#save as value 
+#N <- length(unique(HU$Hum))
+N <- length(HU$Hum)
+
+#---------------------------------------------------------
+#N0_: count total number of unique gene_symbols per chem 
+#save as matrix use for margin count
+uniq.chem <- 
+  do.call(rbind, 
+          lapply(CG, function(x) length(unique(x$gene_symbol))))
+
+N0_ <- uniq.chem
+
+#---------------------------------------------------------
+#N_0: count number of DIS genes & save as list 
+N_0 <- length(random_subsets3[[1]]) 
+
+#---------------------------------------------------------
+#a: count number of genes related to DIS and Chem for each chemical
+a <- sapply(CG, function(x) sum(x$gene_symbol %in% random_subsets5[[1]])); a<-as.matrix(a, ncol=1)
+
+#---------------------------------------------------------
+#Get cell/margin counts using values obtained above
+b = N0_ - a;
+c = N_0 - a;
+d = N-a-b-c;
+N1_ = N - N0_; 
+N_1 = N - N_0;
+#---------------------------------------------------------
+#Hum_t: 2x2 tables for all chemicals stored as list of dfs
+Hum_t <- list()
+for (i in 1:length(CG)) {
+  
+  Hum_t[[i]] <- matrix(c(a[i], b[i], N0_[1], 
+                         c[i], d[i], N1_[1], 
+                         N_0,  N_1,  N), ncol=3, byrow=T)
+  
+  rownames(Hum_t[[i]]) <- c("Yes","No","Total")
+  colnames(Hum_t[[i]]) <- c("Yes","No","Total")
+  
+  Hum_t[[i]] <- as.data.frame(Hum_t[[i]])
+}
+
+#save names to match chem list 
+names(Hum_t) <- names(CG)
+
+#===============================================================================
+#4: Fishers exact test
+#===============================================================================
+# Fisher test
+fisher5 <- lapply(Hum_t, function(x) fisher.test(x[1:2,1:2], simulate.p.value = TRUE))
+f5 <- data.frame(matrix(unlist(fisher5), nrow=1008, byrow=TRUE),stringsAsFactors=FALSE) 
+
+
+#fix names names
+row.names(f5) <- names(Hum_t)
+names(f5)[1] <- "fisher_pvalue"
+names(f5)[2] <- "fisher_LCI"
+names(f5)[3] <- "fisher_UCI"
+names(f5)[4] <- "fisher_estimate"
+
+#restrict 
+f5<- select(f5, 1:4)
+
+#FDR correction
+f5$sample_size <- rep("400", 1008)
+```
+
+# set6
+
+```{r}
+#---------------------------------------------------------
+#N: count number of genes in human genome list
+#save as value 
+#N <- length(unique(HU$Hum))
+N <- length(HU$Hum)
+
+#---------------------------------------------------------
+#N0_: count total number of unique gene_symbols per chem 
+#save as matrix use for margin count
+uniq.chem <- 
+  do.call(rbind, 
+          lapply(CG, function(x) length(unique(x$gene_symbol))))
+
+N0_ <- uniq.chem
+
+#---------------------------------------------------------
+#N_0: count number of DIS genes & save as list 
+N_0 <- length(random_subsets6[[1]]) 
+
+#---------------------------------------------------------
+#a: count number of genes related to DIS and Chem for each chemical
+a <- sapply(CG, function(x) sum(x$gene_symbol %in% random_subsets6[[1]])); a<-as.matrix(a, ncol=1)
+
+#---------------------------------------------------------
+#Get cell/margin counts using values obtained above
+b = N0_ - a;
+c = N_0 - a;
+d = N-a-b-c;
+N1_ = N - N0_; 
+N_1 = N - N_0;
+#---------------------------------------------------------
+#Hum_t: 2x2 tables for all chemicals stored as list of dfs
+Hum_t <- list()
+for (i in 1:length(CG)) {
+  
+  Hum_t[[i]] <- matrix(c(a[i], b[i], N0_[1], 
+                         c[i], d[i], N1_[1], 
+                         N_0,  N_1,  N), ncol=3, byrow=T)
+  
+  rownames(Hum_t[[i]]) <- c("Yes","No","Total")
+  colnames(Hum_t[[i]]) <- c("Yes","No","Total")
+  
+  Hum_t[[i]] <- as.data.frame(Hum_t[[i]])
+}
+
+#save names to match chem list 
+names(Hum_t) <- names(CG)
+
+#===============================================================================
+#4: Fishers exact test
+#===============================================================================
+# Fisher test
+fisher6 <- lapply(Hum_t, function(x) fisher.test(x[1:2,1:2], simulate.p.value = TRUE))
+f6 <- data.frame(matrix(unlist(fisher6), nrow=1008, byrow=TRUE),stringsAsFactors=FALSE) 
+
+
+#fix names names
+row.names(f6) <- names(Hum_t)
+names(f6)[1] <- "fisher_pvalue"
+names(f6)[2] <- "fisher_LCI"
+names(f6)[3] <- "fisher_UCI"
+names(f6)[4] <- "fisher_estimate"
+
+#restrict 
+f6<- select(f6, 1:4)
+
+#FDR correction
+f6$sample_size <- rep("1000", 1008)
+```
+
+# plot
+
+```{r}
+#comine 
+simulated <- rbind.data.frame(f, f2, f3, f4, f5, f6)
+
+#fact finding
+sim5 <- filter(simulated, fisher_pvalue < 0.05)
+
+#convert
+class(simulated$fisher_FDR)
+class(simulated$fisher_pvalue)
+class(simulated$sample_size)
+class(f$fisher_pvalue)
+
+#simulated$sample_size <- as.factor(simulated$sample_size)
+#reorder legend 
+simulated$sample_size <- factor(simulated$sample_size, levels = c('50','100','150','200','400','1000'))
+
+simulated$fisher_pvalue <- as.numeric(simulated$fisher_pvalue)
+
+#try combined plot -- need to use pvalue not fdr (all 1s) 
+sim<-ggplot(simulated, aes(x = fisher_pvalue, fill = sample_size)) +
+  geom_density(alpha = 0.3) + 
+  labs(title = "Fisher Exact Test p-values density plot", x = "p-value for association", y = "Density") +
+  geom_vline(xintercept = 0.05, linetype = "dashed" ) +
+  theme_minimal()
+
+## need to fix order for legend 
+
+#plot(density(simulated$fisher_pvalue))
+ggsave("G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/output/S4_negative_control_density_6.16.26.png", plot = sim, width = 10, height = 7, units = "in", dpi = 300)
+
+#have one done and saved can tweek as needed!
+
+```
+
+```{r}
+#=====================================================================================
+## Cross Validation
+#===================================================================================
+library(RColorBrewer)
+
+sample
+
+cv_int  <- list(); cv_gene <- list(); cv_rac  <- list()
+chisq_test <- array(); fisher_test <- array()
+# No. of random samples
+cut_offs <- c(100, 500, 1000, 2500, 5000, 10000)
+# set color
+cols  <- colorRampPalette(brewer.pal(12, "Set3"), alpha=TRUE)(length(cut_offs))
+
+lapply(cut_offs, function(N0_) {
+  
+  for (i in 1:100) {
+    
+    # random sample
+    cv_int[[i]]  <- sample.int(N, 100)              
+    cv_gene[[i]] <- HU$Hum[cv_int[[i]],]      
+    # find intersections between chemical and pseudo Disease-Gene list 
+    cv_rac[[i]]  <- cv_gene[[i]][which(cv_gene[i]$Hum %in% DIS$gene_symbol),] 
+    
+    a = nrow(cv_rac[[i]])
+    b = N0_ - a;
+    c = N_0 - a;
+    d = N-a-b-c;
+    N1_ = N - N0_; 
+    N_1 = N - N_0;
+    
+    Table <- matrix(c(a,b,N0_,c,d,N1_,N_0,N_1,N), ncol=3, byrow=T)
+    Table <- as.data.frame.matrix(Table)
+    
+    if (N0_ <= 1000) {
+      chisq_res <- chisq.test(Table[1:2,1:2], simulate.p.value=T)
+      chisq_test[i] <- chisq_res$p.value
+    } else {
+      chisq_res <- chisq.test(Table[1:2,1:2], correct=F)
+      chisq_test[i] <- chisq_res$p.value       
+    }
+    
+    
+    fisher_res <- fisher.test(Table[1:2,1:2])
+    fisher_test[i] <- fisher_res$p.value
+    
+  }
+  
+  hist(chisq_test, las=1, col="dodgerblue", breaks=20,
+       xlim=c(0,1), ylim=c(0,600),
+       xlab="Chi-squared p-values for association",
+       main=as.character(paste0("Chisq, Sample size = ", N0_)))
+  
+  hist(fisher_test, las=1, col="darkorange", breaks=20,
+       xlim=c(0,1), ylim=c(0,600),
+       xlab="Fisher's test p-values for association",
+       main=as.character(paste0("Fisher, Sample size = ", N0_)))
+})
+
+
+
+```
+

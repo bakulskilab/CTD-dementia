@@ -1,0 +1,363 @@
+---
+title: "02_DataManagement"
+format: html
+editor: visual
+---
+
+```{r}
+
+#set paths
+source_path= "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/"
+source_path2="G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/Alz&Dem resubmit 2026/"
+
+
+#libraries
+library(data.table)
+library(tidyverse)
+library(openxlsx)
+
+
+```
+
+# Load human and chemical data
+
+```{r}
+
+#--------:HUMAN GENOME
+hum <- fread(paste0(source_path, "CTD_human_genes_1.2.25.csv"))
+
+
+#--------:CHEMICAL-GENE
+chem <- fread(paste0(source_path, "CTD_chem_gene_ixns.8.7.25..csv")) #raw
+
+```
+
+# Human
+
+```{r}
+#1: Select columns for human gene list 
+names(hum)[1]<- "gene_symbol"
+names(hum)[2]<- "gene_name"
+
+hum<-select(hum , 1:2)
+
+#save
+write.xlsx(hum, "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/CTD_human_genes_cleaned_1.2.25.xlsx")
+```
+
+# Chemical
+
+```{r}
+#2: Format/select chemical-gene interaction list 
+
+#select relevant columns 
+chem<- select(chem, 1:5, 7:8, 11)
+
+
+#set column names
+names(chem)[1]<- "chemical_name"
+names(chem)[2]<- "chemical_id"
+names(chem)[3]<- "casRN"
+names(chem)[4]<- "gene_symbol"
+names(chem)[5]<- "gene_id"
+names(chem)[6]<- "organism"
+names(chem)[7]<- "organism_id"
+names(chem)[8]<- "pub_med_id"
+names(chem)
+
+#check number of unique chemicals 
+length(unique(chem$chemical_name)) #15,167
+#check<- chem %>% distinct(chemical_name) #15,167
+
+```
+
+## Apply filters: human genes only, non duplicate gene-chemical pairs
+
+```{r}
+
+#Filter chemical dataset for human genes only 
+chem<- filter(chem, organism_id == 9606)
+table(chem$organism_id, useNA = "always")
+length(unique(chem$chemical_name))
+check<- chem %>% distinct(chemical_name) #10,951
+
+
+
+#filter chemical dataset set for non-duplicate chem-gene_symbol pairs
+chem<- chem %>% select(gene_symbol, everything())
+chem <-chem[!duplicated(chem[,1:2])]
+
+
+#check
+length(unique(chem$chemical_name))
+length(unique(chem$chemical_id))
+length(unique(chem$gene_symbol))
+
+
+#double check
+t= summary(chem$gene_symbol %in% hum$gene_symbol)
+t=unique(chem$gene_symbol)
+t=unique(chem$chemical_name)
+
+#Cross check with human list to ensure we only have human
+check_dis<-inner_join(humc, chem, by = "gene_symbol")  
+rm(check_dis)
+
+unique(length())
+length(unique(chem$chemical_name))
+
+```
+
+## Save cleaned overall chemical dataset
+
+```{r}
+#save 
+write.xlsx(chem, "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/CTD_chem_gene_ixns_cleaned_10.30.25.xlsx")
+
+```
+
+## Restrict cleaned chemical data to include those with \>= 50 genes
+
+```{r}
+#Load cleaned chemical dataset 
+chem <- read.xlsx("G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/CTD_chem_gene_ixns_cleaned_10.30.25.xlsx")
+
+
+#count number of gene symbols per chemical 
+agg_tbl <- chem %>% group_by(chemical_name) %>% 
+  summarise(total_count=n(),
+            .groups = 'drop')
+
+#Restrict chemical list to those with >= 50 gene annotations 
+agg_tbl1  <- filter(agg_tbl, total_count >= 50 )
+length(unique(agg_tbl1$chemical_name)) #1008
+
+mean(agg_tbl1$total_count)
+min(agg_tbl1$total_count)
+max(agg_tbl1$total_count)
+
+#subset full list 
+ge50_names = agg_tbl1$chemical_name
+zes<-subset(chem, chemical_name %in% ge50_names)
+
+#double check 
+d<-unique(zes$chemical_name) #1008 - all good
+
+#save
+write.xlsx(zes, "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/CTD_chem_GE50_genes_10.30.25.xlsx")
+
+```
+
+# Convert format human, chemical, and disease dataframes to list for analysis
+
+## Human
+
+```{r}
+
+#HUMAN GENE LIST
+hum <- read.xlsx(paste0(source_path, "CTD_human_genes_cleaned_1.2.25.xlsx"))
+
+#select relevant columns only for each data set
+HU <- select(hum, 1)
+
+#Save each data frame as a list for easier manipulation 
+HU<- as.list(HU)
+
+#Set column name of human gene list
+#Allows us to access information within the list easier
+names(HU) <- c("Hum")
+
+#save and load into analysis file 
+    saveRDS(HU, file = "human_gene_list_11.3.25_list.rds")
+
+```
+
+## Format chemical
+
+```{r}
+
+#CHEMICAL GENE LIST 
+chem<- read.xlsx(paste0(source_path, "CTD_chem_GE50_genes_10.30.25.xlsx")) 
+
+#select relevant columns only for each data set
+CH <- select(chem, 1,2)
+
+#Save each data frame as a list for easier manipulation 
+#Split chem data frame by chemical name & saves as list
+#CG:shows each chemical and number of unique gene_symbols 
+CG <- split(CH, f = CH$chemical_name) 
+
+#save and load into analysis file 
+    saveRDS(CG, file = "chemical_gene_list_analytic_11.3.25.rds")
+```
+
+## Format disease lists
+
+```{r}
+source_path2= "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/8.6.25 download/"
+```
+
+### Alzheimer disease
+
+```{r}
+#AD
+dis <- read.xlsx(paste0(source_path2, "CTD_AD_8.6.25.xlsx")) #105
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "ad_list_11.3.25.rds"))
+```
+
+### ER stress
+
+```{r}
+#ER
+dis <- read.xlsx(paste0(source_path2, "CTD_ERstress_8.6.25.xlsx")) #348
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "er_list_11.3.25.rds"))
+```
+
+### Integrated stress response
+
+```{r}
+#isr
+dis <- read.xlsx(paste0(source_path2, "CTD_ISR_8.6.25.xlsx")) #53
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "isr_list_11.3.25.rds"))
+```
+
+### Microglial cell activation
+
+```{r}
+#mgca
+dis <- read.xlsx(paste0(source_path2, "CTD_microglial_cell_activation_8.6.25.xlsx")) #70
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "mgca_list_11.3.25.rds"))
+```
+
+### Neuroinflammatory diseases
+
+```{r}
+#NID
+dis <- read.xlsx(paste0(source_path2, "CTD_neuroinflammatoryDiseases_8.6.25.xlsx")) #33
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "nid_list_11.3.25.rds"))
+```
+
+### Proteostasis deficencies
+
+```{r}
+#pro.def
+dis <- read.xlsx(paste0(source_path2, "CTD_proteostatsisDeficencies_8.6.25.xlsx")) #127
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "pro.def_list_11.3.25.rds"))
+```
+
+### Response to unfolded protein
+
+```{r}
+#RUP
+dis <- read.xlsx(paste0(source_path2, "CTD_RUP_8.6.25.xlsx")) #179
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "rup_list_11.3.25.rds"))
+```
+
+### Tauopathies
+
+```{r}
+#TAU
+dis <- read.xlsx(paste0(source_path2, "CTD_tau_8.6.25.xlsx")) #111
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "tau_list_11.3.25.rds"))
+```
+
+### TDP-proteinopathies
+
+```{r}
+
+#TDPP
+dis <- read.xlsx(paste0(source_path2, "CTD_TDPProteinopathies_8.6.25.xlsx")) #112
+
+#select relevant columns only for each data set
+dis<- select(dis, 1)
+
+#Save each data frame as a list for easier manipulation 
+DIS<- as.list(dis)
+
+#save and load into analysis file 
+saveRDS(DIS, file = paste0(source_path, "tdpp_list_11.3.25.rds"))
+
+
+```
+
+### AGORA list
+
+```{r}
+
+
+angora <- read.csv(paste0(source_path2, "gene_list_ANGORA_june92026.csv"))
+
+#select
+agora<- select(angora, 1)
+names(agora)[1] <- "Gene.symbol" 
+
+#save as list 
+Agora<- as.list(agora)
+
+#save as rds for analysis 
+saveRDS(Agora, file = "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/code review 12.2.25/agora_list_6.10.26.rds")
+
+```

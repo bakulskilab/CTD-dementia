@@ -1,0 +1,1200 @@
+---
+title: "CTD dementia enrichment analysis figures and tables"
+format: html
+editor: visual
+---
+
+```{r}
+#| echo: false
+
+#libraries
+library(tidyverse)
+library(openxlsx)
+library(patchwork)
+library(openxlsx)
+library(gtsummary)
+library(gt)
+library(gdata) #allows for cbind with different rows - autopacks NA values
+library(ggplot2)
+
+#set path
+source_path = "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/output/"
+source_path2 = "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/data/"
+source_path3 = "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/Mansucript draft/"
+source_path4= "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/data/8.6.25 download/"
+a_path = "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/Alz&Dem resubmit 2026/"
+m_path2 = "G:/My Drive/Bakulski Lab/Projects/DNAm and HRS/CTD-Dementia/Mansucript draft/"
+
+```
+
+# Load results lists
+
+```{r}
+ad<- read.xlsx(paste0(source_path, "ad_11.5.25.xlsx")) 
+er<- read.xlsx(paste0(source_path, "er_11.5.25.xlsx"))
+isr<- read.xlsx(paste0(source_path, "isr_11.5.25.xlsx"))
+mgca<- read.xlsx(paste0(source_path, "mgca_11.5.25.xlsx"))
+prod<- read.xlsx(paste0(source_path, "pro.def_11.5.25.xlsx"))
+rup<- read.xlsx(paste0(source_path, "rup_11.5.25.xlsx"))
+tau<- read.xlsx(paste0(source_path, "tau_11.5.25.xlsx"))
+tdpp<- read.xlsx(paste0(source_path, "tdp_11.5.25.xlsx"))
+
+agora<- read.xlsx(paste0(source_path, "agora_6.10.26.xlsx"))
+
+```
+
+```{r}
+
+#chemical list with categories assigned (generated in 02_apply_chemical_classifications)
+t1<- read.xlsx(paste0(source_path2, "CTD_all_analytic_categories_1364_10.28.25.xlsx")) 
+
+##=====: generate table 1
+# Summarize data by Category, getting desired descriptives
+summary_data <- t1 %>%
+  group_by(category) %>%
+  summarise(
+    min1 = min(total_count),
+    Quartile1 = quantile(total_count, probs = 0.25),
+    Median_Value2 = median(total_count),
+    Quartile3 = quantile(total_count, probs = 0.75),
+    max1 = max(total_count)
+  ) %>%
+  ungroup()
+
+
+write.xlsx(summary_data, paste0(source_path, "CTD_table1_11.11.25.xlsx"))
+```
+
+# Supplemental table 1 & 2
+
+## chemical and disease gene lists
+
+```{r}
+#1. Create supplemental table 1: list of all chemicals and gene symbols
+#----------------------------------------------------------------------
+chem<- read.xlsx(paste0(source_path, "CTD_chem_GE50_genes_10.30.25.xlsx")) 
+
+#try pivot wider 
+test.chem <- chem %>% select(chemical_name, gene_symbol) %>%
+  group_by(chemical_name) %>%
+  mutate(row_id = row_number()) %>% #add unique id to get the gene symbols to list out
+  pivot_wider(names_from = chemical_name, values_from = gene_symbol)
+
+#save
+write.xlsx(test.chem , paste0(source_path3, "CTD_supplemental_table1_11.5.25.xlsx"))
+
+
+#2. Create supplemental table 2: disease list and genes for each in one df
+#--------------------------------------------------
+#DISEASE GENE LISTS 
+adis <- read.xlsx(paste0(source_path4, "CTD_AD_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(Alzheimers.disease = Gene.symbol)
+
+agora.ad <- read.csv(paste0(a_path, "gene_list_ANGORA_june92026.csv")) %>% 
+  select(Gene.Symbol) %>%
+  rename(AGORA.AD = Gene.Symbol) 
+
+agora.ad <- agora.ad %>%
+  arrange(agora.ad)
+  
+edis <- read.xlsx(paste0(source_path4, "CTD_ERstress_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(ER.stress = Gene.symbol)
+  
+idis <- read.xlsx(paste0(source_path4, "CTD_ISR_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(Integrated.stress.response = Gene.symbol)
+
+
+mdis <- read.xlsx(paste0(source_path4, "CTD_microglial_cell_activation_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(microglial.cell.activation = Gene.symbol)
+
+
+pdis <- read.xlsx(paste0(source_path4, "CTD_proteostatsisDeficencies_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(proteostatsis.deficencies = Gene.symbol)
+
+
+rdis <- read.xlsx(paste0(source_path4, "CTD_RUP_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(Response.to.unfolded.protein = Gene.symbol)
+
+
+tdis <- read.xlsx(paste0(source_path4, "CTD_tau_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(Tauopathies = Gene.symbol)
+
+
+tddis <- read.xlsx(paste0(source_path4, "CTD_TDPProteinopathies_8.6.25.xlsx")) %>% 
+  select(Gene.symbol) %>%
+  rename(TDP.proteinopathies = Gene.symbol)
+
+#cbind above
+all.dis <- cbindX(agora.ad, adis, edis, idis, mdis, pdis, rdis, tdis, tddis)
+
+#save
+write.xlsx(all.dis, paste0(source_path, "CTD_supplemental_table2_6.10.26.xlsx"))
+#-------------------------------------------------------------------------------
+
+```
+
+# Figure 2
+
+## volcano plots per disease list: colored by significance PRR is a fold change calculated as a ratio of two proportions- one represents frequency of adverse event for the drug of interest and the other represents the frequency of the same event for other drugs or a comparison group PRR 2 - indicates specific adverse event is reported twice as frequently for the drug of interest compared to the comparison group representing 2 fold increase PRR 0.5- indicates event is reported half as frequently for the drug of interest representing a 2-fold decrease with log2 transformation: PRR of 1 (null) becomes 0; PRR of 2 (twice the reporting) becomes 1 PRR of 0.5 (half the reporting) becomes -1
+
+```{r}
+#calculate log2 (PRR) and -log10(p-value)
+ad$log2prr <- log2(ad$prr)
+ad$log10p <- -log10(ad$fisher_FDR)
+
+agora$log2prr <- log2(agora$prr)
+agora$log10p <- -log10(agora$fisher_FDR)
+
+er$log2prr <- log2(er$prr)
+er$log10p <- -log10(er$fisher_FDR)
+
+isr$log2prr <- log2(isr$prr)
+isr$log10p <- -log10(isr$fisher_FDR)
+
+mgca$log2prr <- log2(mgca$prr)
+mgca$log10p <- -log10(mgca$fisher_FDR)
+
+prod$log2prr <-log2(prod$prr)
+prod$log10p <- -log10(prod$fisher_FDR)
+
+rup$log2prr <-log2(rup$prr)
+rup$log10p <- -log10(rup$fisher_FDR) 
+
+tau$log2prr <- log2(tau$prr) 
+tau$log10p <- -log10(tau$fisher_FDR)
+
+tdpp$log2prr<- log2(tdpp$prr)
+tdpp$log10p <- -log10(tdpp$fisher_FDR)
+```
+
+```{r}
+#view distribution to select min and max X & Y limits for plotting 
+summary(ad$log2prr)
+summary(agora$log2prr) 
+summary(er$log2prr)
+summary(isr$log2prr)
+summary(mgca$log2prr)
+summary(prod$log2prr)
+summary(rup$log2prr)
+summary(tau$log2prr)
+summary(tdpp$log2prr)
+
+
+summary(ad$log10p)
+summary(agora$log10p) 
+summary(er$log10p)
+summary(isr$log10p)
+summary(mgca$log10p)
+summary(prod$log10p)
+summary(rup$log10p)
+summary(tau$log10p)
+summary(tdpp$log10p)
+```
+
+```{r}
+#set thresholds
+p.threshold <- 0.05
+prr.threshold <- 2
+
+#plot using transformed
+
+ad. <- ggplot(ad, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       y = "-Log10 (P-value)",
+       title = "Alzheimer's disease") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot")  
+
+#print(ad.)
+
+er. <- ggplot(er, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       y = "-Log10 (P-value)",
+       title = "Response to ER stress") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+print(er.)
+
+isr. <- ggplot(isr, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(#x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       y = "-Log10 (P-value)",
+       title = "Integrated stress response") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        #axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+#mga------
+mgca. <- ggplot(mgca, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(#x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+      # y = "-Log10 (P-value)",
+       title = "Microglial cell activation") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+#AGORA AD
+agora. <- ggplot(agora, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       y = "-Log10 (P-value)",
+       title = "Agora Alzheimer's disease") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+
+#prod
+prod. <- ggplot(prod, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       y = "-Log10 (P-value)",
+       title = "Proteostasis deficiencies") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+
+#RUP
+rup. <- ggplot(rup, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       y = "-Log10 (P-value)",
+       title = "Response to unfolded protein") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+#tau
+tau. <- ggplot(tau, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(x = "Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes",
+       #y = "-Log10 (P-value)",
+       title = "Tauopathies", 
+color = "") +
+  theme_minimal() + # Use a minimal theme +
+  theme(#axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "bottom", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+#tdp
+tdpp. <- ggplot(tdpp, aes(x = log2prr, y = log10p)) +
+  geom_point(aes(color = ifelse(log10p > -log10(p.threshold) & abs(log2prr) > log2(prr.threshold),
+                                ifelse(log2prr > 0, "Enriched", "Depleted"),
+                                "No enrichment or depletion")), # Color points based on significance and change
+             alpha = 0.5) + # Add transparency
+  geom_vline(xintercept = c(-log2(prr.threshold), log2(prr.threshold)), # Vertical lines for fold change thresholds
+             linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(p.threshold), # Horizontal line for p-value threshold
+             linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Enriched" = "red", "Depleted" = "blue", "No enrichment or depletion" = "gray")) +
+  scale_x_continuous(limits = c(-6.522, 6.7940)) +
+  scale_y_continuous(limits = c(0, 263.860)) +
+  labs(title = "TDP-Proteinopathies") +
+  theme_minimal() + # Use a minimal theme +
+  theme(axis.title.x = element_blank(), # Removes x-axis title
+        axis.title.y = element_blank(), 
+        legend.position = "none", 
+        plot.title = element_text(hjust = 0.5), 
+        plot.title.position = "plot") 
+
+
+```
+
+```{r}
+comb.plot<- (agora. + ad. + er. + isr. + mgca. + prod. + rup. + tau. + tdpp.) 
+comb.plot 
+
+ggsave("G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/output/disease_volcanoplots_6.10.26.tif", plot = comb.plot, width = 10, height = 7, units = "in", dpi = 300)
+```
+
+# Supplemental figure 2
+
+## upset plot of disease lists
+
+```{r}
+library(UpSetR)
+
+#setwd only used for this chunk for ease of reading formatting and plotting 
+# R enviornment cleared and reloaded after 
+setwd("G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/8.6.25 download/")
+
+#Read Result data in as a list 
+#-------------------------------------------------------------------------------
+#1: vector with files names
+my_files <- list.files(pattern = "\\.xlsx$")
+
+
+#2: Create list 
+my_data <- lapply(my_files, read.xlsx)
+#1: get names in better format 
+names(my_data) <- stringr::str_replace(my_files, pattern = ".xlsx", replacement = "")
+
+#-------
+listinput <- list(Alzheimers.disease = my_data[["CTD_AD_8.6.25"]][["Gene.symbol"]], 
+                  Response.ER.stress = my_data[["CTD_ERstress_8.6.25"]][["Gene.symbol"]], 
+                  Integrated.stress.response = my_data[["CTD_ISR_8.6.25"]][["Gene.symbol"]],
+                  Microglial.cell.activation = my_data[["CTD_microglial_cell_activation_8.6.25"]][["Gene.symbol"]], 
+                  Proteostasis.deficiencies = my_data[["CTD_proteostatsisDeficencies_8.6.25"]][["Gene.symbol"]], 
+                  Agora.AD = my_data[["gene_list_ANGORA_june92026"]][["Gene.Symbol"]], 
+                  Response.unfolded.protein = my_data[["CTD_RUP_8.6.25"]][["Gene.symbol"]], 
+                  Tauopathies = my_data[["CTD_tau_8.6.25"]][["Gene.symbol"]], 
+                  TDPproteinopathies = my_data[["CTD_TDPProteinopathies_8.6.25"]][["Gene.symbol"]])
+
+
+
+
+
+png(file="upset9.900.700.png", width = 8, height = 6, units = "in", res = 300)
+upset(fromList(listinput), nsets=9)
+dev.off()
+
+
+tiff(filename = "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/upsetplot.10.29.25.tif", # Desired filename
+     width = 8,                   # Width in inches
+     height = 6,                  # Height in inches
+     units = "in",                # Units for width and height
+     res = 300)                   # Resolution in DPI (dots per inch)
+
+upset(fromList(listinput), nsets=9)
+dev.off()
+
+
+
+```
+
+## Prep for table 2 and supplemental table 3
+
+```{r}
+cat<-readRDS(paste0(source_path2, "chem_with_cats_1008_11.10.25.rds"))
+
+agora.ad<- read.xlsx(paste0(source_path, "agora_6.10.26.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Agora.Alzheimer's disease") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+ad<- read.xlsx(paste0(source_path, "ad_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Alzheimer's disease") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+er<- read.xlsx(paste0(source_path, "er_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI,fisher_FDR) %>%
+mutate(disease = "ER stress") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+isr<- read.xlsx(paste0(source_path, "isr_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Integrated stress response") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+mgca<- read.xlsx(paste0(source_path, "mgca_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Microglial cell activation") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+prod<- read.xlsx(paste0(source_path, "pro.def_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Proteostasis deficencies") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+rup<- read.xlsx(paste0(source_path, "rup_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Response to unfolded protein") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+tau<- read.xlsx(paste0(source_path, "tau_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "Tauopathies") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+tdpp<- read.xlsx(paste0(source_path, "tdp_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, prr_LCI, prr_UCI, fisher_FDR) %>%
+mutate(disease = "TDP proteinopathies") %>%
+ mutate(enriched = ifelse(prr >= 2, 1, 0)) %>%
+ left_join(cat, by = "chemical_name")
+
+#all.dis <- rbind(ad, er, isr, mgca, nid, prod, rup, tau, tdpp)
+all.dis <- rbind(agora.ad, ad, er, isr, mgca, prod, rup, tau, tdpp)
+
+```
+
+# Supplemental table 3
+
+## results each chemical and each pathway (ranked)
+
+```{r}
+# Calculate rank within each group and then sum the ranks
+top_hits_table <- all.dis %>%
+  group_by(disease) %>%
+  mutate(Rank = rank(fisher_FDR)) %>% # Rank by value (smaller value = better rank)
+  ungroup() %>%
+  group_by(chemical_name) %>%
+  summarise(Summed_Rank = sum(Rank), .groups = 'drop') %>%
+  arrange(Summed_Rank) 
+
+# Calculate rank within each group and then sum the ranks
+ranked_hits_table <- all.dis %>%
+  group_by(disease) %>%
+  mutate(Rank = rank(fisher_FDR)) 
+
+
+
+#reorder columns
+names(ranked_hits_table)
+ranked_hits_table <- ranked_hits_table %>% select(Rank, chemical_name, category, total_count, disease, prr, fisher_FDR)
+
+
+#split ranked hits table by disease list and pull out the top 20 rank, chems, prr, fdr
+split_dfs <- split(ranked_hits_table, ranked_hits_table$disease)
+  
+
+  
+#access each 
+ad. <- split_dfs$`Alzheimer's disease`
+agora.ad. <- split_dfs$`Agora.Alzheimer's disease`
+er. <- split_dfs$`ER stress`
+isr. <- split_dfs$`Integrated stress response`
+mgca. <- split_dfs$`Microglial cell activation`
+prod. <- split_dfs$`Proteostasis deficencies`
+rup. <- split_dfs$`Response to unfolded protein`
+tau. <- split_dfs$Tauopathies
+tdpp. <- split_dfs$`TDP proteinopathies`
+
+#select relevent columns
+ad. <- ad. %>%
+  select(Rank, chemical_name, category, total_count, prr, fisher_FDR)
+agora.ad. <- agora.ad. %>% select(Rank, prr, fisher_FDR)
+er. <- er. %>% select(Rank, prr, fisher_FDR)
+isr. <- isr. %>% select(Rank, prr, fisher_FDR)
+mgca. <- mgca. %>% select(Rank, prr, fisher_FDR)
+prod. <- prod. %>% select(Rank, prr, fisher_FDR)
+rup. <- rup. %>% select(Rank, prr, fisher_FDR)
+tau. <- tau. %>% select(Rank, prr, fisher_FDR)
+tdpp. <- tdpp. %>% select(Rank, prr, fisher_FDR)
+
+
+#rbind 
+newsup3<- cbind(ad., agora.ad., er., isr., mgca., prod., rup., tau., tdpp.)
+
+
+test<-left_join(newsup3, top_hits_table, by= "chemical_name")
+
+names(top_hits_table)
+newsup3.<- test %>% select(Summed_Rank, chemical_name, category, total_count, everything())
+
+```
+
+# Table 2: top hits
+
+```{r}
+#read in categories 
+cat<-readRDS(paste0(source_path2, "chem_with_cats_1008_11.10.25.rds"))
+
+table(cat$ca)
+
+
+#Sum the ranks"
+names(all.dis)
+
+# Calculate rank within each group and then sum the ranks
+top_hits_table <- all.dis %>%
+  group_by(disease) %>%
+  mutate(Rank = rank(fisher_FDR)) %>% # Rank by value (smaller value = better rank)
+  ungroup() %>%
+  group_by(chemical_name) %>%
+  summarise(Summed_Rank = sum(Rank), .groups = 'drop') %>%
+  arrange(Summed_Rank) %>%
+  head(n = 20) # Display top 20 items based on summed rank
+
+
+#merge the two to get gene count and category 
+top_hits_table_cats <- left_join(top_hits_table, cat, by = "chemical_name")
+
+#reorder 
+# deselect category -- not needed now
+top_hits_table_cats <- top_hits_table_cats %>% select(Summed_Rank, chemical_name, -category, total_count)
+
+
+#split ranked hits table by disease list and pull out the top 20 rank, chems, prr, fdr
+split_dfs <- split(ranked_hits_table, ranked_hits_table$disease)
+  
+# Vector defining the desired order and values to filter by
+order_vector <- c("bisphenol A",
+                  "sodium arsenite",
+                  "Benzo(a)pyrene",
+                  "Valproic Acid",
+                  "Tretinoin",
+                  "Arsenic Trioxide",
+                  "Acetylcysteine",
+                  "Cadmium Chloride",
+                  "Particulate Matter",
+                  "Tobacco Smoke Pollution",
+                  "Hydrogen Peroxide",
+                  "Cisplatin",
+                  "Glucose",
+                  "Curcumin",
+                  "Doxorubicin",
+                  "Estradiol",
+                  "Air Pollutants",
+                  "Resveratrol",
+                  "Quercetin",
+                  "Copper")
+
+
+  
+#access each 
+ad. <- split_dfs$`Alzheimer's disease`
+agora.ad. <- split_dfs$`Agora.Alzheimer's disease`
+er. <- split_dfs$`ER stress`
+isr. <- split_dfs$`Integrated stress response`
+mgca. <- split_dfs$`Microglial cell activation`
+prod. <- split_dfs$`Proteostasis deficencies`
+rup. <- split_dfs$`Response to unfolded protein`
+tau. <- split_dfs$Tauopathies
+tdpp. <- split_dfs$`TDP proteinopathies`
+
+# Filter and reorder the data frame
+ad.f <- ad.[match(order_vector, ad.$chemical_name), ] 
+agora.ad.f <- agora.ad.[match(order_vector, agora.ad.$chemical_name), ]
+er.f <- er.[match(order_vector, er.$chemical_name), ] 
+isr.f <- isr.[match(order_vector, isr.$chemical_name), ]
+mgca.f <- mgca.[match(order_vector, mgca.$chemical_name), ]
+prod.f <- prod.[match(order_vector, prod.$chemical_name), ]
+rup.f <- rup.[match(order_vector, rup.$chemical_name), ]
+tau.f <- tau.[match(order_vector, tau.$chemical_name), ]
+tdpp.f<- tdpp.[match(order_vector, tdpp.$chemical_name), ]
+
+
+
+```
+
+```{r}
+#select and reorder columns
+ad.f <- ad.f %>% select(chemical_name, Rank, fisher_FDR)
+agora.ad.f <- agora.ad.f %>% select(Rank, fisher_FDR)
+er.f <- er.f %>% select(Rank, fisher_FDR)
+isr.f <- isr.f %>% select(Rank, fisher_FDR)
+mgca.f <- mgca.f %>% select(Rank, fisher_FDR)
+prod.f <- prod.f %>% select(Rank, fisher_FDR)
+rup.f <- rup.f %>% select(Rank, fisher_FDR)
+tau.f <- tau.f %>% select(Rank, fisher_FDR)
+tdpp.f <- tdpp.f %>% select(Rank, fisher_FDR)
+
+
+#rbind  
+table2<- cbind(top_hits_table_cats, ad.f, agora.ad.f, er.f, isr.f, mgca.f, prod.f, rup.f, tau.f, tdpp.f)
+
+#save
+#write.xlsx(table2, paste0(a_path, "Table2.6.11.26.xlsx"))
+```
+
+# Figure 3
+
+## Heat map: top hits vs. all chemicals
+
+```{r}
+##fix spelling mistake
+prod.f$disease <- gsub("Proteostasis deficencies", "Proteostasis deficiencies", prod.f$disease)
+
+
+
+#--------------------------heat map 
+one.dis.ranked <- rbind(ad.f, agora.ad.f, er.f, isr.f, mgca.f, prod.f, rup.f, tau.f, tdpp.f)
+
+#format
+subset_one_2 <- one.dis.ranked %>% select(chemical_name, disease, prr)
+names(subset_one_2)[3] <- "PRR"
+length(unique(one.dis.ranked$chemical_name))
+
+subset_one_2$chemical_name <- factor(subset_one_2$chemical_name, levels = rev(sort(unique(subset_one_2$chemical_name))))
+
+#plot
+plt<- ggplot(data = subset_one_2, aes(x=disease, y=chemical_name, fill=PRR))
+plt<- plt + geom_tile()
+
+# further customizing the heatmap by
+# applying colors and title
+#+scale_y_reverse()
+plt <- plt + theme_minimal() 
+
+# setting gradient color as red and white
+scale_fill_gradient2(
+high = "red",
+mid = "grey",
+low = "blue",
+midpoint = 1)
+plt <- plt + scale_fill_gradient(low="grey", high="red")
+
+
+
+# setting x and y labels using labs
+plt <- plt + labs(x ="Disease pathways", y ="Chemical") 
+
+
+# plotting the Heatmap
+plt<- plt + theme(axis.text.x=element_text(angle = -90, hjust = 0)) 
+
+plt
+
+ggsave(filename = 'G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/output/heatmap_top20_6.11.26.png',
+       plot = plt,
+       height = 11,
+       width = 8.5)
+```
+
+# Supplemental Table 4.
+
+## top chemicals that reach FDR \< 10-6 for all 9 lists
+
+```{r}
+
+ adp <- ad %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ agorap <- agora.ad %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ erp <- er %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ isrp <- isr %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ mgcap <- mgca %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ prodp <- prod %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ rupp <- rup %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ taup <- tau %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ tdppp <- tdpp %>%  
+   filter(fisher_FDR < 0.000001)
+ 
+ 
+  adp <- ad %>% filter(fisher_FDR <0.05)
+ agorap <- agora %>% filter(fisher_FDR <0.05)
+ erp <- er %>% filter(fisher_FDR <0.05)
+ isrp <- isr %>% filter(fisher_FDR <0.05)
+ mgcap <- mgca %>% filter(fisher_FDR <0.05)
+ prodp <- prod %>% filter(fisher_FDR <0.05)
+ rupp <- rup %>% filter(fisher_FDR <0.05)
+ taup <- tau %>% filter(fisher_FDR <0.05)
+ tdppp <- tdpp %>% filter(fisher_FDR <0.05)
+ 
+ length(unique(test2$chemical_name))
+ 
+ 
+ #-------------------------------collapse
+#find common
+common_rows<- Reduce(intersect, list(agorap$chemical_name,
+                                     adp$chemical_name, erp$chemical_name, 
+                                     isrp$chemical_name, mgcap$chemical_name,
+                                     prodp$chemical_name, rupp$chemical_name,                                            taup$chemical_name ,tdppp$chemical_name))
+
+#stack 
+one.dis<-rbind(ad, agora.ad, er, isr, mgca, prod, rup, tau, tdpp)
+
+subset_one <- one.dis[one.dis$chemical_name %in% common_rows, ]
+
+
+#merge in summed rank table and out of the already pvalue restricted chemicals, now select the top 15 by summed rank 
+test2 <- left_join(subset_one, top_hits_table, by = "chemical_name")
+top15 <- head(top_hits_table, n=15)
+subset25<-one.dis[one.dis$chemical_name %in% top15$chemical_name, ]
+length(unique(subset25$chemical_name))
+
+#clean up: just need disease list name, chemical name, and prr. Round.  
+subset15 <- subset25 %>% select(chemical_name, disease, prr)
+subset15$prr <- round(subset15$prr, digits = 1)
+
+s4<-split(subset15, subset15$disease)
+
+ad4 <- s4$`Alzheimer's disease`
+agora4 <- s4$`AGORA.Alzheimer's disease`
+er4 <- s4$`ER stress`
+isr4 <- s4$`Integrated stress response`
+mgca4 <- s4$`Microglial cell activation`
+prod4 <- s4$`Proteostasis deficencies`
+rup4 <- s4$`Response to unfolded protein`
+tau4 <- s4$Tauopathies
+tdpp4 <- s4$`TDP proteinopathies`
+
+order_vector15 <- c("bisphenol A",
+                  "sodium arsenite",
+                  "Benzo(a)pyrene",
+                  "Valproic Acid",
+                  "Tretinoin",
+                  "Arsenic Trioxide",
+                  "Acetylcysteine",
+                  "Cadmium Chloride",
+                  "Particulate Matter",
+                  "Tobacco Smoke Pollution",
+                  "Hydrogen Peroxide",
+                  "Cisplatin",
+                  "Glucose",
+                  "Curcumin",
+                  "Doxorubicin")
+
+# Filter and reorder the data frame
+ad4 <- ad4[match(order_vector15, ad4$chemical_name), ] 
+agora4 <- agora4[match(order_vector15, agora4$chemical_name), ]
+er4 <- er4[match(order_vector15, er4$chemical_name), ] 
+isr4 <- isr4[match(order_vector15, isr4$chemical_name), ]
+mgca4 <- mgca4[match(order_vector15, mgca4$chemical_name), ]
+prod4 <- prod4[match(order_vector15, prod4$chemical_name), ]
+rup4 <- rup4[match(order_vector15, rup4$chemical_name), ]
+tau4 <- tau4[match(order_vector15, tau4$chemical_name), ]
+tdpp4<- tdpp4[match(order_vector15, tdpp4$chemical_name), ]
+
+all4 <- cbind(ad4, agora4, er4, isr4, mgca4, prod4, rup4, tau4, tdpp4)
+
+#save
+write.xlsx(all4, paste0(a_path, "Stable4_6.12.26.xlsx"))
+
+
+
+```
+
+# Supplemental Table 5.
+
+## Chemical categories in the rows, AD pathways in the columns, cells have \# chemicals (%) enriched per pathway. RR 2 - indicates specific adverse event is reported twice as frequently
+
+### Associated if FDR \< 10-6
+
+### Dep PRR \< 1
+
+### Enr PRR \> 1
+
+```{r}
+cat<-readRDS(paste0(source_path2, "chem_with_cats_1008_11.10.25.rds"))
+
+#read in each and subset 
+ad<- read.xlsx(paste0(source_path, "ad_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+ mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+left_join(cat, by = "chemical_name")
+
+#agora
+agora<- read.xlsx(paste0(source_path, "agora_6.10.26.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+ mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+left_join(cat, by = "chemical_name")
+
+
+er<- read.xlsx(paste0(source_path, "er_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+  mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name")
+
+
+
+isr<- read.xlsx(paste0(source_path, "isr_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+  mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name")
+
+
+mgca<- read.xlsx(paste0(source_path, "mgca_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+ mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name")
+
+
+prod<- read.xlsx(paste0(source_path, "pro.def_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+  mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name")
+
+
+rup<- read.xlsx(paste0(source_path, "rup_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+  mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name")
+
+
+
+tau<- read.xlsx(paste0(source_path, "tau_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+  mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name")
+
+
+
+tdpp<- read.xlsx(paste0(source_path, "tdp_11.5.25.xlsx")) %>% 
+select(chemical_name, prr, fisher_FDR) %>%
+  mutate(enriched = case_when(prr< 1 ~ "Depleted" ,prr > 1 ~ "Enriched", TRUE ~ "null")) %>%
+ filter(fisher_FDR < 0.000001) %>%
+ left_join(cat, by = "chemical_name") 
+
+
+
+
+```
+
+```{r}
+table(ad$enriched)
+table(er$enriched)
+table(isr$enriched)
+table(mgca$enriched)
+table(prod$enriched)
+table(rup$enriched)
+table(tau$enriched)
+table(tdpp$enriched)
+```
+
+```{r}
+# Group by category and calculate n and % for value_col == 1
+ade <- ad %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+add <- ad %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+agorae <- agora %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched'))
+
+agorad <- agora %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Depleted'))
+
+
+ere <- er %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+erd <- er %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+
+isre <- isr %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+isrd <- isr %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+mgcae <- mgca %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+mgcad <- mgca %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+
+prode <- prod %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+prodd <- prod %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+rupe <- rup %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+rupd <- rup %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+taue <- tau %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+taud <- tau %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+tdppe <- tdpp %>%
+  group_by(category) %>%
+  summarize(en = sum(enriched == 'Enriched')) 
+
+tdppd <- tdpp %>%
+  group_by(category) %>%
+  summarize(dep = sum(enriched == 'Depleted'))
+
+#isr, mgca, left out intentionally due to different numbers of rows and binding
+all<-cbind(add, ade, agorad, agorae, erd, ere, prodd, prode, rupd, rupe, taud, taue, tdppd, tdppe)
+
+write.xlsx(all, paste0(a_path, "Stable5partial_6.12.26.xlsx") )
+
+alli <- cbind(isrd, isre) 
+
+
+allm <- cbind(mgcad, mgcae)
+
+
+
+
+```
+
+# Supplemental Table 6.
+
+## Hallmarks genes in rows, \# chemicals in this gene list in a column, list of chemicals in the column APOE, APP, PSEN1, PSEN2, MAPT
+
+```{r}
+
+#gene symbols 
+#apoe = 348
+#APP = 351
+#PSEN1 = 5663 
+#PSEN2 = 5664 
+#MAPT  = 4137 
+
+
+chem<- read.xlsx(paste0(source_path, "CTD_chem_GE50_genes_10.30.25.xlsx"))
+
+#try group by and search 
+chem.apoe <- chem %>% 
+  filter(gene_symbol == "APOE")
+
+chem.app <- chem %>% 
+  filter(gene_symbol == "APP")
+
+chem.psen1 <- chem %>%
+  filter(gene_symbol == "PSEN1")
+
+chem.psen2 <- chem %>%
+  filter(gene_symbol == "PSEN2")
+
+chem.mapt <- chem %>%
+  filter(gene_symbol == "MAPT")
+
+```
+
+```{r}
+#copies the variable values to your clip board and you can copy and paste 
+library(clipr)
+
+
+write_clip(chem.apoe$chemical_name)
+write_clip(chem.app$chemical_name)
+write_clip(chem.psen1$chemical_name)
+write_clip(chem.psen2$chemical_name)
+write_clip(chem.mapt$chemical_name)
+```
+
+# prr forest plots
+
+```{r}
+one.dis <- read.xlsx("G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/Mansucript draft/Supplemental_Table3_11.6.25.xlsx")
+```
+
+```{r}
+#-------------------------------------------------------------------------------
+# Calculate rank within each group and then sum the ranks
+top_hits_table <- all.dis %>%
+  group_by(disease) %>%
+  mutate(Rank = rank(fisher_FDR)) %>% # Rank by value (smaller value = better rank)
+  ungroup() %>%
+  group_by(chemical_name) %>%
+  summarise(Summed_Rank = sum(Rank), .groups = 'drop') %>%
+  arrange(Summed_Rank) %>%
+  head(n = 10) # Display top 20 items based on summed rank
+
+
+#dataset input: "all.dis" generated line 485 prep for table 2 -->
+#then ranked hits --> then top hits
+#then subset ranked hits by names in top hits 
+top10.names <- top_hits_table$chemical_name
+top10.names <- c("bisphenol A",
+                  "sodium arsenite",
+                  "Benzo(a)pyrene",
+                  "Valproic Acid",
+                  "Tretinoin",
+                  "Arsenic Trioxide",
+                  "Acetylcysteine",
+                  "Cadmium Chloride",
+                  "Particulate Matter",
+                  "Tobacco Smoke Pollution")
+
+
+top10<- ranked_hits_table[ranked_hits_table$chemical_name %in% top10.names, ]
+
+#PRR forest plot
+# to maintain order throughout the plot 
+top10$chem_ID <- paste0(top10$chemical_name, "_" ,top10$disease)
+
+
+#transform 
+top10$log2prr <- log2(top10$prr)
+top10$log2prr_LCI <- log2(top10$prr_LCI)
+top10$log2prr_UCI <- log2(top10$prr_UCI)
+top10$log10p <- -log10(top10$fisher_FDR)
+
+
+#Forest Plots
+
+library(ggsci)
+
+#plot  
+fp.prr <- ggplot(data=top10, aes(x=chem_ID, y=log2prr, ymin=log2prr_LCI, ymax=log2prr_UCI, color = disease)) +
+  geom_pointrange()+ 
+  geom_hline(yintercept=0, lty=1, size =1) +  
+  geom_hline(yintercept=-1, lty=2, color = "blue") +
+  geom_hline(yintercept=1, lty=2, color = "red") +
+  geom_errorbar(aes(ymin=log2prr_LCI, ymax=log2prr_UCI), width=0.5, cex=0.5)+ 
+  coord_flip() + 
+  geom_point(shape = 15, size = 2) +
+  xlab("Chemical") +
+  ylab("Log2 (Proportional Reporting Ratio): Measure of overlap between chemical genes and pathway genes") + 
+  scale_color_ucscgb()
+
+fp.prr
+
+
+
+
+```
+
+```{r}
+ggsave(filename = 'G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/output/forestplot_top10_6.11.26.pdf',
+       plot = fp.prr,
+       height = 11,
+       width = 8.5)
+```
+

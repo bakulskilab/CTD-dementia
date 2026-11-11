@@ -1,0 +1,49 @@
+---
+title: "CTD overlap R2R"
+format: html
+editor: visual
+---
+
+## overlap testing with ANGORA nominated AD gene therapeutic target
+
+```{r}
+#| echo: false
+
+#library
+library(tidyverse)
+library(openxlsx)
+
+
+#set path
+source_path="G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/Alz&Dem resubmit 2026/"
+
+#data
+angora <- read.csv(paste0(source_path, "gene_list_ANGORA_june92026.csv"))
+ctd <- read.xlsx(paste0(source_path,"CTD_supplemental_table2_10.7.25.xlsx"), startRow = 2, colNames = TRUE)
+
+```
+
+```{r}
+angora <- angora %>% arrange(angora)
+```
+
+```{r}
+head(angora)
+```
+
+```{r}
+###make upset plot!                                                        
+angora.AD<- intersect(angora$Gene.Symbol, ctd$Alzheimers.disease)            #35 --> 70
+angora.er<- intersect(angora$Gene.Symbol, ctd$ER.stress)                     #19 --> 329  
+angora.isr<- intersect(angora$Gene.Symbol, ctd$Integrated.stress.response)   #2  --> 51
+angora.mca<- intersect(angora$Gene.Symbol, ctd$microglial.cell.activation)   #18 --> 52
+angora.nid<- intersect(angora$Gene.Symbol, ctd$neuroinflammatory.diseases)   #8  --> 25
+angora.pd<- intersect(angora$Gene.Symbol, ctd$proteostatsis.deficencies)     #20 --> 107
+angora.rup<- intersect(angora$Gene.Symbol, ctd$Response.to.unfolded.protein) #9  --> 170
+angora.tau<- intersect(angora$Gene.Symbol, ctd$Tauopathies)                  #38 --> 73
+angora.tdp<- intersect(angora$Gene.Symbol, ctd$TDP.proteinopathies)          #15 --> 97
+
+
+
+
+```

@@ -1,0 +1,206 @@
+---
+title: "Apply chemical classifications"
+format: html
+editor: visual
+---
+
+```{r}
+#libraries
+library(data.table)
+library(tidyverse)
+library(openxlsx)
+
+#Path 
+source_path = "G:/My Drive/Bakulski Lab/Projects/CTD-Dementia/data/"
+
+#Data
+#Parent list of chemical names with MeshID, and CTD Chemical ID sean based categorization after
+chem_names <- read.xlsx(paste0(source_path, "ctd_31_meshparentsplit_4.29.25.xlsx"))
+
+#Analytic sample 
+chem <- read.xlsx(paste0(source_path, "CTD_chem_GE50_genes_10.30.25.xlsx"))
+```
+
+# Create list of names with ChemicalID for analytic sample (n=1008)
+
+```{r}
+  
+#Aggregate to get single occurance of chemical name
+agg_tbl <- chem %>% group_by(chemical_name) %>% 
+  summarise(total_count=n(),
+            .groups = 'drop')
+
+df<- left_join(agg_tbl, chem_names, by = "chemical_name")
+
+```
+
+```{r}
+#save
+saveRDS(catsubset4, paste0(source_path, "chem_with_cats_1008_11.10.25.rds"))
+```
+
+# Get predefined chemical classifications
+
+## read each tab as its own data frame
+
+```{r}
+#===============================================================================
+#2. get chemical classifications
+#--------------------------------------------------
+#Download each tab as a data frame 
+vit <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 2) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Vitamins and Dietary Components") %>%
+  arrange(desc(category))
+
+metal <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 3) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Metals and Metal Compounds") %>%
+  arrange(desc(category))
+
+fluro <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 4) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Fluorocarbons") %>%
+  arrange(desc(category))
+
+phthalic <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 5) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Phthalic Acids and Plasticizers") %>%
+  arrange(desc(category))
+
+pesticides <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 6) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Pesticides, Pesticide Synergists and Cholinesterase Inhibitors")#
+
+VOCs <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 7) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Volatile Organic Compounds")#
+
+polychl <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 8) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Polychlorinated Biphenyls and Flame Retardants")#
+
+PAH <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 9) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Polycyclic Aromatic Hydrocarbons")#
+
+environmental.pol <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 10) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Environmental Pollutants and Complex Mixtures")#
+
+pytoestrog <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 11) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Pytoestrogens, Alkaloids, and Terpenes")#
+
+personal.care <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 12) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Personal Care, Consumer Products, Therapeutic Agents, Pharmacologic Actions and Specialty Use Chemicals")#
+
+biological.fac <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 13) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Biological Factors")#
+
+elements <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 14) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Elements and Minerals")#
+
+flourine <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 15) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Flourine, Chlorine or Bromine Compounds")#
+
+sulfur <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 16) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Sulfur compounds")#
+
+other.nitrogen.comps <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 17) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Other Nitrogen-Containing Compounds (Amides, Amidines, Amines, Azo, Hydrazines, Isocyanates, Triazines, Nitriles, Nitro and Nitroso Compounds)")#
+
+carboxylic <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 18) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Carboxylic acids")#
+
+hydrocarbons <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 19) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Hydrocarbons (Chlorinated, Acyclic, Aromatic, Halogenated, Cyclic, Other)")#
+
+organophosphorus <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 20) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Organophosphorus compounds")#
+
+other.org.comps <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 21) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Other Organic Chemicals (Ethers, Alcohols, Aldehydes, Ketones, Lactones, Quinones, Carbohydrates, Lipids, Organosilicon)")#
+
+heterocyclic.comps <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 22) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Heterocyclic compounds")#
+
+hormones <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 23) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Hormones, Hormone Substitutes, Steroids and Hormone Antagonists")#
+
+nucleic.acids <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 24) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Nucleic Acids, Nucleotides, Nucleosides, Amino Acids, Peptides, and Proteins")#
+
+other <- read.xlsx(paste0(source_path, "Categorization_plan_090325.xlsx"), sheet = 25) %>%
+  select(chemical_name, ChemicalID) %>%
+  mutate(category = "Other (Selenium Compounds, Onium Compounds, Gases, Free Radicals, Coordination Complexes, Noxae, Boron Compounds)")#
+
+
+```
+
+# Assign categories
+
+```{r}
+#check names
+names(df)
+
+#Subset to needed columns only 
+df1 <- df %>% select(chemical_name, gene_count, total_count, ChemicalID)
+
+
+#Apply categories 
+t1<-df1 %>%
+  mutate(category = case_when(ChemicalID %in% vit$ChemicalID ~ "Vitamins and Dietary Components", 
+                              ChemicalID %in% metal$ChemicalID ~ "Metals and Metal Compounds", 
+                              ChemicalID %in% fluro$ChemicalID ~ "Fluorocarbons",
+                              ChemicalID %in% phthalic$ChemicalID ~ "Phthalic Acids and Plasticizers", 
+                              ChemicalID %in% pesticides$ChemicalID ~ "Pesticides, Pesticide Synergists and Cholinesterase Inhibitors", 
+                              ChemicalID %in% VOCs$ChemicalID ~ "Volatile Organic Compounds",
+                              ChemicalID %in% polychl$ChemicalID ~ "Polychlorinated Biphenyls and Flame Retardants",
+                              ChemicalID %in% PAH$ChemicalID ~ "Polycyclic Aromatic Hydrocarbons",
+                              ChemicalID %in% environmental.pol$ChemicalID ~ "Environmental Pollutants and Complex Mixtures",
+                              ChemicalID %in% pytoestrog$ChemicalID ~ "Pytoestrogens, Alkaloids, and Terpenes",
+                              ChemicalID %in% personal.care$ChemicalID ~ "Personal Care, Consumer Products, Therapeutic Agents, Pharmacologic Actions and Specialty Use Chemicals", #
+                              ChemicalID %in% biological.fac$ChemicalID ~ "Biological Factors", #
+                              ChemicalID %in% elements$ChemicalID ~ "Elements and Minerals",
+                              ChemicalID %in% flourine$ChemicalID ~ "Flourine, Chlorine or Bromine compounds", #
+                              ChemicalID %in% sulfur$ChemicalID ~ "Sulfur compounds",
+                              ChemicalID %in% other.nitrogen.comps$ChemicalID ~ "Other Nitrogen-Containing Compounds (Amides, Amidines, Amines, Azo, Hydrazines, Isocyanates, Triazines, Nitriles, Nitro and Nitroso Compounds)", #
+                              ChemicalID %in% carboxylic$ChemicalID ~ "Carboxylic acids", #
+                              ChemicalID %in% hydrocarbons$ChemicalID ~ "Hydrocarbons (Chlorinated, Acyclic, Aromatic, Halogenated, Cyclic, Other)", #
+                              ChemicalID %in% organophosphorus$ChemicalID ~ "Organophosphorus compounds", #
+                              ChemicalID %in% other.org.comps$ChemicalID ~ "Other Organic Chemicals (Ethers, Alcohols, Aldehydes, Ketones, Lactones, Quinones, Carbohydrates, Lipids, Organosilicon", #
+                              ChemicalID %in% heterocyclic.comps$ChemicalID ~ "Heterocyclic Compounds", #
+                              ChemicalID %in% hormones$ChemicalID ~ "Hormones, Hormone Substitutes, Steroids and Hormone Antagonists", #
+                              ChemicalID %in% nucleic.acids$ChemicalID ~ "Nucleic Acids, Nucleotides, Nucleosides, Amino Acids, Peptides, and Proteins", #
+                              ChemicalID %in% other$ChemicalID ~ "Other (Selenium Compounds, Onium Compounds, Gases, Free Radicals, Coordination Complexes, Noxae, Boron Compounds)"))
+
+#Check 
+table(t1$category, useNA = "always")
+
+
+#assign 10 chems with NA category to "other"
+t1$category[is.na(t1$category)] <- "other"
+
+#restrict to columns needed 
+#t1<- t1 %>% select(1,20,13:16, 19)
+
+#save
+write.xlsx(t1, paste0(source_path, "CTD_all_analytic_categories_1364_10.28.25.xlsx"))
+
+```
+
+
