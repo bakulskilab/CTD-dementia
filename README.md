@@ -1,7 +1,7 @@
 # CTD-dementia
 Title: Identification of chemicals targeting dementia genes and pathways in the Comparative Toxicogenomics Database
 
-ABSTRACT:
+## ABSTRACT:
 
 INTRODUCTION
 Dementia is a public health challenge and exposures likely contribute to risk, though many have not been evaluated. We screened chemicals for enrichment with dementia genes and related pathways.
@@ -16,11 +16,14 @@ DISCUSSION
 We identified chemicals enriched for dementia pathways, suggesting broad classes of chemicals contribute to dementia.
 Keywords: Alzheimer's disease, chemical exposures, data mining, dementia, exposome, neurotoxicology
 
+
+Manuscript links:
 Alzheimers Dement. 2026 Aug 25;22(8):e71775. doi: 10.1002/alz.71775 
 PMCID: PMC13504461  PMID: 42638620 
 
 
-Code file summary:
+
+## Code file summary:
 
 01_data_management: Data cleaning and file preparation 
 
@@ -45,4 +48,7 @@ Overlap testing with nominated therapeutic target genes for AD treatment or prev
 06_cross_validation:
 Cross validation testing 
 
-
+## Data used in this analysis 
+Data used in this analysis is publicly available at: 
+Comparative Toxicogenomics Data base: https://ctdbase.org/
+Agora: https://agora.adknowledgeportal.org/
